@@ -18,6 +18,16 @@ if (!isset($argv[2])){
 $refPath = $argv[1];
 $newPath = $argv[2];
 
+if (!file_exists($refPath)) {
+    echo "*** Reference file does not exist".PHP_EOL;
+    exit;
+}
+
+if (!file_exists($newPath)) {
+    echo "*** Comparison file does not exist".PHP_EOL;
+    exit;
+}
+
 $ignore_keys = array();
 if (isset($argv[3])) {
     $ignore_keys = explode(",", $argv[3]);
