@@ -1,0 +1,101 @@
+#!/usr/bin/env php
+
+<?php
+
+$usage = "jsondiff <reference.json> <comparison.json> [ignored_keys]".PHP_EOL;
+
+// Setup
+if (!isset($argv[1])){
+    echo "*** Please provide a reference file".PHP_EOL.$usage;
+    exit;
+}
+
+if (!isset($argv[2])){
+    echo "*** Please provide a comparison file".PHP_EOL.$usage;
+    exit;
+}
+
+$refPath = $argv[1];
+$newPath = $argv[2];
+
+$ignore_keys = array();
+if (isset($argv[3])) {
+    $ignore_keys = explode(",", $argv[3]);
+}
+
+function flattenLeaf($leaf, $path = null) {
+    $paths = array();
+    if (is_array($leaf)) {
+        foreach($leaf as $leafPart) {
+            foreach(flattenLeaf($leafPart, $path) as $key => $val) {
+                $paths[$key] = $val;
+            }
+        }
+
+    } else if (is_object($leaf)) {
+        foreach(get_object_vars($leaf) as $propertyName => $value) {
+            foreach(flattenLeaf($value, $path === null ? $propertyName : $path . "." . $propertyName) as $key => $val) {
+                $paths[$key] = $val;
+            }
+        }
+
+    } else if (is_scalar($leaf)) {
+        $paths[$path] = $leaf;
+
+    }
+
+    return $paths;
+}
+
+$ref = explode("\n", file_get_contents($refPath));
+$new = explode("\n", file_get_contents($newPath));
+
+foreach ($ref as $key => $value) {
+    $c_ref = json_decode($ref[$key]);
+    $c_new = json_decode($new[$key]);
+
+    $f_ref = flattenLeaf($c_ref);
+    $f_new = flattenLeaf($c_new);
+
+
+    $missing_keys = array_diff_key($f_ref, $f_new);
+    $missing_keys = array_merge($missing_keys, array_diff_key($f_new, $f_ref));
+
+    // Show missing keys
+    foreach ($missing_keys as $key => $val){
+
+        if (in_array($key, $ignore_keys)) {
+            continue; 
+        }
+
+        if (!isset($f_ref[$key])) {
+            echo "Missing key in input #1: ". $key.PHP_EOL;
+        }
+        if (!isset($f_new[$key])) {
+            echo "Missing key in input #2: ". $key.PHP_EOL;
+
+        }
+    }
+
+    // Show non-matching data values
+    foreach ($f_ref as $key => $val) {
+
+        if (in_array($key, $ignore_keys)) {
+            continue; 
+        }
+
+        if (!isset($f_ref[$key], $f_new[$key])) {
+            continue;
+        }
+
+        if ($f_ref[$key] !== $f_new[$key]){
+
+            echo "\n-----------------------------------------------------\n";
+            echo "Type mismatch: ". $key. "\n\n";
+            echo "Input A[".$key."]: "; var_dump($f_ref[$key]);
+            echo "Input B[".$key."]: "; var_dump($f_new[$key]);
+        }
+    }
+}
+
+
